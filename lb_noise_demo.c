@@ -17,26 +17,27 @@ static const char *names[] = {
     "Temperature", "Humidity", "Continentalness", "Erosion"
 };
 //block positions, not chunk
-int positions[5][2] = {
-    {-1000, -1000},
-    {1000, 1000},
-    {-1000, 1000},
-    {1000, -1000},
+#define SQUARERANGE 1000
+static const int positions[5][2] = {
+    {-SQUARERANGE, -SQUARERANGE},
+    {SQUARERANGE, SQUARERANGE},
+    {-SQUARERANGE, SQUARERANGE},
+    {SQUARERANGE, -SQUARERANGE},
     {0, 0}
 };
-int tile1[4][2] = {
+static const int tile1[4][2] = {
     {0, 0},
     {1048576, 0},
     {0, 1048576},
     {1048576, 1048576}
 };
-int tile2[4][4][2] = {
+static const int tile2[4][4][2] = {
     {{0, 0}, {2097152, 0}, {0, 2097152}, {2097152, 2097152}},
     {{1048576, 0}, {3145728, 0}, {1048576, 2097152}, {3145728, 2097152}},
     {{0, 1048576}, {2097152, 1048576}, {0, 3145728}, {2097152, 3145728}},
     {{1048576, 1048576}, {3145728, 1048576}, {1048576, 3145728}, {3145728, 3145728}}
 };
-int templimit[6][2] = {
+static const int templimit[6][2] = {
     {0,4000},
     {4000,0},
     {4000,4000},
@@ -44,19 +45,20 @@ int templimit[6][2] = {
     {5000,0},
     {5000,5000}
 };
-int multipliers[4][2] = {
+static const int multipliers[4][2] = {
     {1,1},
     {1,-1},
     {-1,1},
     {-1,-1}
 };
-static const int flood_dx[4] = {256, -256, 0, 0};
-static const int flood_dz[4] = {0, 0, 256, -256};
+#define STEP_SIZE 256
+static const int flood_dx[4] = {STEP_SIZE, -STEP_SIZE, 0, 0};
+static const int flood_dz[4] = {0, 0, STEP_SIZE, -STEP_SIZE};
 static pthread_mutex_t output_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int progress_line_active;
 
-#define FLOOD_QUEUE_CAPACITY 20000
-#define FLOOD_HASH_CAPACITY 65536
+#define FLOOD_QUEUE_CAPACITY 512
+#define FLOOD_HASH_CAPACITY 512
 #define FLOOD_TILING_RADIUS 41
 #define FLOOD_TILING_WIDTH (2 * FLOOD_TILING_RADIUS + 1)
 #define TEMPERATURE_0A_TILE_BLOCKS (4096LL * 256 * 4)
@@ -152,7 +154,7 @@ static int temperature_floodfill(LbNoise *n, int64_t x, int64_t z,
         }
     }
     *cells_visited = visited;
-    return 65535 * visited;
+    return STEP_SIZE * STEP_SIZE * visited;
 }
 
 static int check_temperature_candidate(LbNoise *n, int64_t x, int64_t z,
@@ -227,7 +229,7 @@ int check_candidate_seed(LbNoise *n, int64_t x, int64_t z,
             if (!valid)
                 continue;
 
-            // Erosion and continentalness repeat every two humidity periods.
+            // ero and cont tile
             for (int ex = 0; ex < 2; ex++) {
                 for (int ez = 0; ez < 2; ez++) {
                     int64_t ex_origin = hx + ex * HUMIDITY_REPEAT_BLOCKS;
@@ -286,7 +288,7 @@ int check_candidate_seed(LbNoise *n, int64_t x, int64_t z,
                     if (!valid)
                         continue;
 
-                    // Temperature repeats every four humidity periods.
+                    // temp tile
                     for (int tx = 0; tx < 2; tx++) {
                         for (int tz = 0; tz < 2; tz++) {
                             int64_t candidate_x = ex_origin +
@@ -372,7 +374,7 @@ static void *worker_thread(void *data) {
         int bad = 0;
         for (int j = 0; j < 5; j++) {
             if (lb_octave_int(&n, NP_HUMIDITY, 0, 'A', 
-                positions[j][0], positions[j][1]) < 500) bad = 1;
+                positions[j][0], positions[j][1]) < 1000) bad = 1;
             if(bad) break;
         }
         if (bad) {
@@ -389,7 +391,7 @@ static void *worker_thread(void *data) {
             for (int k = 0; k < 5; k++) {
                 erosion_a0[k] = lb_octave_int(&n, NP_EROSION, 0, 'A',
                     x + positions[k][0], z + positions[k][1]);
-                if (erosion_a0[k] > -1700) notbad = 0;
+                if (erosion_a0[k] > -2000) notbad = 0;
                 if (!notbad) break;
             }
             if(!notbad) continue;
@@ -405,7 +407,7 @@ static void *worker_thread(void *data) {
             for (int k = 0; k < 5; k++) {
                 if (lb_octave_int(&n, NP_CONTINENTALNESS, 0, 'A', 
                     x + positions[k][0], z + positions[k][1]
-                    ) < -100) notbad = 0;
+                    ) < 0) notbad = 0;
                 if (!notbad) break;
             }
             if(!notbad) continue;

@@ -11,6 +11,7 @@ void lb_setseed(LbNoise *n, uint64_t seed)
     n->seed = seed;
     n->seeded = 1;
     n->initialized = 0;
+    memset(n->initialized_octaves, 0, sizeof(n->initialized_octaves));
 }
 
 static int valid_parameter(int p)
@@ -18,14 +19,14 @@ static int valid_parameter(int p)
     return p >= NP_TEMPERATURE && p <= NP_EROSION;
 }
 
-static void init_parameter(LbNoise *n, int p)
+static void init_parameter(LbNoise *n, int p, int octaves)
 {
     BiomeNoise b = {0};
     DoublePerlinNoise *d;
     int offset = octave_offsets[p];
     int count;
 
-    setClimateParaSeed(&b, n->seed, 1, p, -1);
+    setClimateParaSeed(&b, n->seed, 1, p, 2 * octaves);
     d = &b.climate[p];
     count = d->octA.octcnt + d->octB.octcnt;
     memcpy(n->octaves + offset, b.oct, count * sizeof(*n->octaves));
@@ -33,15 +34,17 @@ static void init_parameter(LbNoise *n, int p)
     n->climate[p].octA.octaves = n->octaves + offset;
     n->climate[p].octB.octaves = n->octaves + offset + d->octA.octcnt;
     n->initialized |= 1u << p;
+    n->initialized_octaves[p] = (unsigned char)d->octA.octcnt;
 }
 
-static int init(LbNoise *n, int p)
+static int init(LbNoise *n, int p, int octaves)
 {
     if (!n->seeded || !valid_parameter(p))
         return 0;
 
-    if (!(n->initialized & (1u << p)))
-        init_parameter(n, p);
+    if (!(n->initialized & (1u << p)) ||
+        n->initialized_octaves[p] < octaves)
+        init_parameter(n, p, octaves);
     return 1;
 }
 
@@ -81,7 +84,7 @@ double lb_octave(LbNoise *n, int p, int o, char ab, double x, double z)
     if (!n || !valid_parameter(p) || o < 0 || o >= octave_counts[p] ||
         (ab != 'A' && ab != 'B'))
         return NAN;
-    if (!init(n, p) || !part(&n->climate[p], o, ab, x, z, &v))
+    if (!init(n, p, o + 1) || !part(&n->climate[p], o, ab, x, z, &v))
         return NAN;
     return v;
 }
@@ -98,7 +101,7 @@ int lb_octave_prefix_sum(LbNoise *n, int p, int o, double x, double z){
     if (o <= 0)
         return 0;
     if (!n || !valid_parameter(p) ||
-        o > 2 * octave_counts[p] || !init(n, p))
+        o > 2 * octave_counts[p] || !init(n, p, (o + 1) / 2))
         return 0;
 
     const DoublePerlinNoise *d = &n->climate[p];

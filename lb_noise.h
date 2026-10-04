@@ -8,6 +8,7 @@ typedef struct
     uint64_t seed;
     int seeded;
     unsigned int initialized;
+    unsigned char initialized_octaves[4];
     DoublePerlinNoise climate[4];
     PerlinNoise octaves[2 * (2 + 2 + 9 + 4)];
 } LbNoise;

@@ -4,7 +4,7 @@ This reference covers the large-biome Temperature, Humidity (`vegetation`), Cont
 
 ## Example
 
-The reusable [lb_noise.h](lb_noise.h) API and [lb_noise.c](lb_noise.c) implementation expose three operations: store a seed, sample one Perlin component, and sample a prefix containing the first N octave pairs. C has no member-function namespaces, so the short `lb_` prefix groups the API. The seed setter only stores the seed; noise is initialized when a sample is requested. It samples raw climate noise without the biome sampler's local coordinate shift. [lb_noise_demo.c](lb_noise_demo.c) checks the full prefix against Cubiomes' sampler.
+The reusable [lb_noise.h](lb_noise.h) API and [lb_noise.c](lb_noise.c) implementation expose three operations: store a seed, sample one Perlin component, and sample a prefix containing the first N octave pairs. C has no member-function namespaces, so the short `lb_` prefix groups the API. The seed setter only stores the seed; noise initialization is deferred until sampling and grows to the requested octave as needed. It samples raw climate noise without the biome sampler's local coordinate shift. [lb_noise_demo.c](lb_noise_demo.c) checks the full prefix against Cubiomes' sampler.
 
 Build and run it from the repository root:
 
